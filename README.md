@@ -1,5 +1,7 @@
 # stackage-install
 
+[![Build Status](https://travis-ci.org/fpco/stackage-install.svg?branch=master)](https://travis-ci.org/fpco/stackage-install)
+
 `stackage-install` provides a wrapper around the `cabal install` command, which
 will download packages more securely. Initially, this means downloading over an
 HTTPS connection from FP Complete's Amazon S3 mirror of Hackage, though more
