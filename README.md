@@ -11,7 +11,7 @@ is intended to overlap well with `cabal install`. Whenever you would have run
 foo` with [stackage-cli](http://github.com/fpco/stackage-cli) installed), which
 will perform the following steps:
 
-1. Run `cabal install --dry-run ...` to get cabal's build plan
+1. Run `cabal fetch --dry-run ...` to get cabal's build plan
 2. Download the relevant packages from S3, and place them in the locations that `cabal-install` expects
 3. Run `cabal install ...`
 

@@ -35,7 +35,9 @@ import           System.Process           (rawSystem, readProcess)
 -- Since 0.1.0.0
 install :: Settings -> [String] -> IO ExitCode
 install s args = do
-    out <- readProcess (_cabalCommand s) ("install":"--dry-run":args) ""
+    out <- readProcess (_cabalCommand s)
+        ("fetch":"--dry-run":if null args then ["."] else args)
+        ""
     let pkgs = map toPair $ filter (not . toIgnore) $ lines out
     download s pkgs
     rawSystem (_cabalCommand s) ("install":args)
