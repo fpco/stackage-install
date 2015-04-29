@@ -44,6 +44,10 @@ That said, some of the future enhancements discussed below are not planned for
 cabal, in which case this tool will continue to remain relevant for people
 looking for additional security beyond transport security.
 
+## Why Stackage?
+
+See [the same question and its answer on stackage-update](https://github.com/fpco/stackage-update#why-stackage).
+
 ## Future enhancements
 
 * Check hashes of all packages downloaded against a collection of package hashes
