@@ -69,6 +69,8 @@ data Settings = Settings
 defaultSettings :: Settings
 defaultSettings = Settings
     { _getManager = newManager tlsManagerSettings
+        { managerResponseTimeout = Just 90000000
+        }
     , _cabalCommand = "cabal"
     , _downloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
     , _onDownload = \s -> S8.hPut stdout $ S8.pack $ concat
