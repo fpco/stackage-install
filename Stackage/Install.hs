@@ -17,7 +17,8 @@ import qualified Data.ByteString.Char8    as S8
 import qualified Data.Foldable            as F
 import           Data.Function            (fix)
 import           Data.List                (isPrefixOf)
-import           Network.HTTP.Client      (Manager, brRead, newManager,
+import           Network.HTTP.Client      (Manager, brRead,
+                                           managerResponseTimeout, newManager,
                                            parseUrl, responseBody, withResponse)
 import           Network.HTTP.Client.TLS  (tlsManagerSettings)
 import           System.Directory         (createDirectoryIfMissing,
