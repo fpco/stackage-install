@@ -17,10 +17,12 @@ import qualified Data.ByteString.Char8    as S8
 import qualified Data.Foldable            as F
 import           Data.Function            (fix)
 import           Data.List                (isPrefixOf)
-import           Network.HTTP.Client      (Manager, brRead,
+import           Network.HTTP.Client      (Manager, brRead, checkStatus,
                                            managerResponseTimeout, newManager,
-                                           parseUrl, responseBody, withResponse)
+                                           parseUrl, responseBody,
+                                           responseStatus, withResponse)
 import           Network.HTTP.Client.TLS  (tlsManagerSettings)
+import           Network.HTTP.Types       (statusCode)
 import           System.Directory         (createDirectoryIfMissing,
                                            doesFileExist,
                                            getAppUserDataDirectory, renameFile)
@@ -37,7 +39,7 @@ import           System.Process           (rawSystem, readProcess)
 install :: Settings -> [String] -> IO ExitCode
 install s args = do
     out <- readProcess (_cabalCommand s)
-        ("fetch":"--dry-run":if null args then ["."] else args)
+        ("install":"--dry-run":if null args then ["."] else args)
         ""
     let pkgs = map toPair $ filter (not . toIgnore) $ lines out
     download s pkgs
@@ -61,6 +63,7 @@ data Settings = Settings
     , _cabalCommand   :: !FilePath
     , _downloadPrefix :: !String
     , _onDownload     :: !(String -> IO ())
+    , _onDownloadErr  :: !(String -> IO ())
     , _connections    :: !Int
     }
 
@@ -78,6 +81,11 @@ defaultSettings = Settings
         [ "Downloading "
         , s
         , "\n"
+        ]
+    , _onDownloadErr = \s -> S8.hPut stdout $ S8.pack $ concat
+        [ "Error downloading "
+        , s
+        , ", if this is a local package, this message can be ignored\n"
         ]
     , _connections = 8
     }
@@ -100,14 +108,23 @@ download s pkgs = do
             _onDownload s pkg
             createDirectoryIfMissing True $ takeDirectory fp
             req <- parseUrl url
-            withResponse req man $ \res -> do
-                let tmp = fp <.> "tmp"
-                withBinaryFile tmp WriteMode $ \h -> fix $ \loop -> do
-                    bs <- brRead $ responseBody res
-                    unless (S.null bs) $ do
-                        S.hPut h bs
-                        loop
-                renameFile tmp fp
+            let req' = req
+                    { checkStatus = \s x y ->
+                        if statusCode s `elem` [401, 403]
+                            -- See: https://github.com/fpco/stackage-install/issues/2
+                            then Nothing
+                            else checkStatus req s x y
+                    }
+            withResponse req' man $ \res -> if statusCode (responseStatus res) == 200
+                then do
+                    let tmp = fp <.> "tmp"
+                    withBinaryFile tmp WriteMode $ \h -> fix $ \loop -> do
+                        bs <- brRead $ responseBody res
+                        unless (S.null bs) $ do
+                            S.hPut h bs
+                            loop
+                    renameFile tmp fp
+                else _onDownloadErr s pkg
       where
         pkg = concat [name, "-", version]
         targz = pkg ++ ".tar.gz"

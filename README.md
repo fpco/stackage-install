@@ -13,7 +13,7 @@ is intended to overlap well with `cabal install`. Whenever you would have run
 foo` with [stackage-cli](http://github.com/fpco/stackage-cli) installed), which
 will perform the following steps:
 
-1. Run `cabal fetch --dry-run ...` to get cabal's build plan
+1. Run `cabal install --dry-run ...` to get cabal's build plan
 2. Download the relevant packages from S3, and place them in the locations that `cabal-install` expects
 3. Run `cabal install ...`
 
@@ -33,6 +33,15 @@ dependencies, and then to install them. It's theoretically possible that
 in which case the second call may download some packages insecurely. I've
 opened [cabal issue #2566](https://github.com/haskell/cabal/issues/2566) about
 disabling downloading in cabal.
+
+The output from `cabal install --dry-run` doesn't actually give us information
+on which packages need to be downloaded, only the packages to be installed.
+This will be different in the case of local packages. Unfortunately, `cabal
+fetch` won't work for us either, since it accepts different arguments [see
+#2](https://github.com/fpco/stackage-install/issues/2). The compromise we have
+now is to just continue working in the presence of errors during download,
+though a more robust solution would be to check if one of the arguments refers
+to a local package.
 
 ## Why not fix cabal?
 
