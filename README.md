@@ -37,8 +37,8 @@ disabling downloading in cabal.
 The output from `cabal install --dry-run` doesn't actually give us information
 on which packages need to be downloaded, only the packages to be installed.
 This will be different in the case of local packages. Unfortunately, `cabal
-fetch` won't work for us either, since it accepts different arguments [see
-#2](https://github.com/fpco/stackage-install/issues/2). The compromise we have
+fetch` won't work for us either, since it accepts different arguments [see #2](https://github.com/fpco/stackage-install/issues/2).
+The compromise we have
 now is to just continue working in the presence of errors during download,
 though a more robust solution would be to check if one of the arguments refers
 to a local package.
