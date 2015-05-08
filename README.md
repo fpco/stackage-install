@@ -17,6 +17,22 @@ will perform the following steps:
 2. Download the relevant packages from S3, and place them in the locations that `cabal-install` expects
 3. Run `cabal install ...`
 
+## Security
+
+In addition to using HTTPS for download, `stackage-install` can use features of
+the [all-cabal-hashes](https://github.com/commercialhaskell/all-cabal-hashes)
+repository for extra guarantees. In particular, if you have appropriate data in
+your package index (see next paragraph), `stackage-install` will automatically
+verify both the hash of the package contents and the download size. If the
+server attempts to send more data than expected, the download will be
+terminated.
+
+The easiest way to get this extra data into your package index is to use
+[stackage-update](https://github.com/fpco/stackage-update) with the `--hashes`
+option. See [hash
+downloads](https://github.com/fpco/stackage-update#hash-downloads) for more
+information.
+
 ## Caveats
 
 If you have a modified `remote-repo` in your ~/.cabal/config file, this tool
