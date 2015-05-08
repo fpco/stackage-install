@@ -10,7 +10,7 @@ module Stackage.Install
     ) where
 
 import qualified Codec.Archive.Tar        as Tar
-import           Control.Applicative      ((*>))
+import           Control.Applicative      ((*>), (<$>), (<*>))
 import           Control.Concurrent.Async (wait, withAsync)
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
