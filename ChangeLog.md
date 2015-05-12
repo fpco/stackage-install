@@ -1,3 +1,8 @@
+# 0.1.1.0
+
+* `setGetManager`
+* `defaultPackageLocation`/`setPackageLocation`
+
 # 0.1.0.3
 
 * When available, use the [all-cabal-hashes](https://github.com/commercialhaskell/all-cabal-hashes) repository for package hash and size verification.

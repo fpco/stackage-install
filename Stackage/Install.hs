@@ -7,6 +7,11 @@ module Stackage.Install
     , download
     , Settings
     , defaultSettings
+    , setGetManager
+    , setPackageLocation
+    , defaultPackageLocation
+    , setIndexLocation
+    , defaultIndexLocation
     ) where
 
 import qualified Codec.Archive.Tar        as Tar
@@ -86,6 +91,8 @@ data Settings = Settings
     , _onDownload     :: !(String -> IO ())
     , _onDownloadErr  :: !(String -> IO ())
     , _connections    :: !Int
+    , _packageLocation :: !(IO (String -> String -> FilePath))
+    , _indexLocation :: !(IO FilePath)
     }
 
 -- | Default value for 'Settings'.
@@ -109,7 +116,17 @@ defaultSettings = Settings
         , ", if this is a local package, this message can be ignored\n"
         ]
     , _connections = 8
+    , _packageLocation = defaultPackageLocation
+    , _indexLocation = defaultIndexLocation
     }
+
+-- | Set how to get the connection manager
+--
+-- Default: @newManager tlsManagerSettings@
+--
+-- Since 0.1.1.0
+setGetManager :: IO Manager -> Settings -> Settings
+setGetManager x s = s { _getManager = x }
 
 data Package = Package
     { packageHashes    :: Map Text Text
@@ -124,12 +141,10 @@ instance FromJSON Package where
         <*> o .:? "package-size"
 
 getPackageInfo :: FilePath -> Set (String, String) -> IO (Map (String, String) Package)
-getPackageInfo packageDir pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
+getPackageInfo indexTar pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
     lbs <- L.hGetContents h
     loop pkgs0 Map.empty $ Tar.read lbs
   where
-    indexTar = packageDir </> "00-index.tar"
-
     loop pkgs m Tar.Done = do
         when (not $ Set.null pkgs) $
             putStrLn $ "Warning: packages not found in index: " ++ show (Set.toList pkgs)
@@ -164,22 +179,64 @@ data StackageInstallException
     deriving (Show, Typeable)
 instance Exception StackageInstallException
 
+-- | Get the location that a package name/package version combination is stored
+-- on the filesystem.
+--
+-- @~/.cabal/packages/hackage.haskell.org/name/version/name-version.tar.gz@
+--
+-- Since 0.1.1.0
+defaultPackageLocation :: IO (String -> String -> FilePath)
+defaultPackageLocation = do
+    cabalDir <- getAppUserDataDirectory "cabal"
+    let packageDir = cabalDir </> "packages" </> "hackage.haskell.org"
+    return $ \name version ->
+             packageDir </>
+             name </>
+             version </>
+             concat [name, "-", version, ".tar.gz"]
+
+-- | Set the location packages are stored to.
+--
+-- Default: 'defaultPackageLocation'
+--
+-- Since 0.1.1.0
+setPackageLocation :: IO (String -> String -> FilePath) -> Settings -> Settings
+setPackageLocation x s = s { _packageLocation = x }
+
+-- | Set the location the 00-index.tar file is stored.
+--
+-- Default: 'defaultIndexLocation'
+--
+-- Since 0.1.1.0
+setIndexLocation :: IO FilePath -> Settings -> Settings
+setIndexLocation x s = s { _indexLocation = x }
+
+-- | Get the location that the 00-index.tar file is stored.
+--
+-- @~/.cabal/packages/hackage.haskell.org/00-index.tar@
+--
+-- Since 0.1.1.0
+defaultIndexLocation :: IO FilePath
+defaultIndexLocation = do
+    cabalDir <- getAppUserDataDirectory "cabal"
+    return $ cabalDir </> "packages" </> "hackage.haskell.org" </> "00-index.tar"
+
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
 -- Since 0.1.0.0
 download :: F.Foldable f => Settings -> f (String, String) -> IO ()
 download s pkgs = do
-    cabalDir <- getAppUserDataDirectory "cabal"
-    let packageDir = cabalDir </> "packages" </> "hackage.haskell.org"
-    withAsync (getPackageInfo packageDir $ Set.fromList $ F.toList pkgs) $ \a -> do
+    indexFP <- _indexLocation s
+    packageLocation <- _packageLocation s
+    withAsync (getPackageInfo indexFP $ Set.fromList $ F.toList pkgs) $ \a -> do
         man <- _getManager s
-        parMapM_ (_connections s) (go packageDir man (wait a)) pkgs
+        parMapM_ (_connections s) (go packageLocation man (wait a)) pkgs
   where
     unlessM p f = do
         p' <- p
         unless p' f
 
-    go packageDir man getPackageInfo pair@(name, version) = do
+    go packageLocation man getPackageInfo pair@(name, version) = do
         unlessM (doesFileExist fp) $ do
             _onDownload s pkg
             packageInfo <- getPackageInfo
@@ -238,10 +295,7 @@ download s pkgs = do
         pkg = concat [name, "-", version]
         targz = pkg ++ ".tar.gz"
         defUrl = _downloadPrefix s ++ targz
-        fp = packageDir </>
-             name </>
-             version </>
-             targz
+        fp = packageLocation name version
 
 validHash :: String -> Maybe Text -> Context SHA512 -> IO ()
 validHash _ Nothing _ = return ()
