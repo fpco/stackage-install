@@ -53,7 +53,7 @@ import           System.Directory         (createDirectoryIfMissing,
                                            doesFileExist,
                                            getAppUserDataDirectory, renameFile)
 import           System.Exit              (ExitCode)
-import           System.FilePath          (takeDirectory, (<.>), (</>))
+import           System.FilePath          (takeDirectory, (<.>), (</>), takeExtension)
 import           System.IO                (IOMode (ReadMode, WriteMode), stdout,
                                            withBinaryFile)
 import           System.Process           (rawSystem, readProcess)
@@ -143,20 +143,22 @@ instance FromJSON Package where
 getPackageInfo :: FilePath -> Set (String, String) -> IO (Map (String, String) Package)
 getPackageInfo indexTar pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
     lbs <- L.hGetContents h
-    loop pkgs0 Map.empty $ Tar.read lbs
+    loop pkgs0 Map.empty False $ Tar.read lbs
   where
-    loop pkgs m Tar.Done = do
-        when (not $ Set.null pkgs) $
+    loop pkgs m sawJSON Tar.Done = do
+        when (not (Set.null pkgs) && sawJSON) $
             putStrLn $ "Warning: packages not found in index: " ++ show (Set.toList pkgs)
         return m
-    loop _ m (Tar.Fail e) = throwIO $ Couldn'tReadIndexTarball indexTar e
-    loop pkgs m (Tar.Next e es) =
+    loop _ m _ (Tar.Fail e) = throwIO $ Couldn'tReadIndexTarball indexTar e
+    loop pkgs m sawJSON (Tar.Next e es) =
         case (getName $ Tar.entryPath e, Tar.entryContent e) of
             (Just pair, Tar.NormalFile lbs _)
                     | pair `Set.member` pkgs
                     , Just p <- decode lbs ->
-                loop (Set.delete pair pkgs) (Map.insert pair p m) es
-            _ -> loop pkgs m es
+                loop (Set.delete pair pkgs) (Map.insert pair p m) sawJSON' es
+            _ -> loop pkgs m sawJSON' es
+      where
+        sawJSON' = sawJSON || takeExtension (Tar.entryPath e) == ".json"
 
     getName name =
         case T.splitOn "/" $ T.pack name of
