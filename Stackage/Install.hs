@@ -46,10 +46,14 @@ import           Data.Typeable            (Typeable)
 import           Data.Word                (Word64)
 import           Network.HTTP.Client      (Manager, brRead,
                                            managerResponseTimeout, newManager,
-                                           parseRequest, responseBody,
+                                           responseBody,
                                            responseStatus, withResponse
 #if MIN_VERSION_http_client(0,5,0)
+                                           , parseRequest
                                            , responseTimeoutMicro
+#else
+                                           , parseUrl
+                                           , checkStatus
 #endif
                                            )
 import           Network.HTTP.Client.TLS  (tlsManagerSettings)
@@ -264,8 +268,19 @@ download s pkgs = do
                             , packageSize p
                             )
             createDirectoryIfMissing True $ takeDirectory fp
-            req <- parseRequest url
-            withResponse req man $ \res -> if statusCode (responseStatus res) == 200
+#if MIN_VERSION_http_client(0,5,0)
+            req' <- parseRequest url
+#else
+            req <- parseUrl url
+            let req' = req
+                    { checkStatus = \s x y ->
+                        if statusCode s `elem` [401, 403]
+                            -- See: https://github.com/fpco/stackage-install/issues/2
+                            then Nothing
+                            else checkStatus req s x y
+                    }
+#endif
+            withResponse req' man $ \res -> if statusCode (responseStatus res) == 200
                 then do
                     let tmp = fp <.> "tmp"
                     withBinaryFile tmp WriteMode $ \h -> do
