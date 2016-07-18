@@ -1,3 +1,7 @@
+# 0.1.2
+
+* http-client 0.5
+
 # 0.1.1.1
 
 * Only print warning on missing files if index has JSON files

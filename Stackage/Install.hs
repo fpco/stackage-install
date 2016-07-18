@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE ViewPatterns       #-}
@@ -43,10 +44,14 @@ import qualified Data.Text                as T
 import           Data.Text.Encoding       (encodeUtf8)
 import           Data.Typeable            (Typeable)
 import           Data.Word                (Word64)
-import           Network.HTTP.Client      (Manager, brRead, checkStatus,
+import           Network.HTTP.Client      (Manager, brRead,
                                            managerResponseTimeout, newManager,
-                                           parseUrl, responseBody,
-                                           responseStatus, withResponse)
+                                           parseRequest, responseBody,
+                                           responseStatus, withResponse
+#if MIN_VERSION_http_client(0,5,0)
+                                           , responseTimeoutMicro
+#endif
+                                           )
 import           Network.HTTP.Client.TLS  (tlsManagerSettings)
 import           Network.HTTP.Types       (statusCode)
 import           System.Directory         (createDirectoryIfMissing,
@@ -101,7 +106,13 @@ data Settings = Settings
 defaultSettings :: Settings
 defaultSettings = Settings
     { _getManager = newManager tlsManagerSettings
-        { managerResponseTimeout = Just 90000000
+        { managerResponseTimeout =
+#if MIN_VERSION_http_client(0,5,0)
+            responseTimeoutMicro
+#else
+            Just
+#endif
+            90000000
         }
     , _cabalCommand = "cabal"
     , _downloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
@@ -253,15 +264,8 @@ download s pkgs = do
                             , packageSize p
                             )
             createDirectoryIfMissing True $ takeDirectory fp
-            req <- parseUrl url
-            let req' = req
-                    { checkStatus = \s x y ->
-                        if statusCode s `elem` [401, 403]
-                            -- See: https://github.com/fpco/stackage-install/issues/2
-                            then Nothing
-                            else checkStatus req s x y
-                    }
-            withResponse req' man $ \res -> if statusCode (responseStatus res) == 200
+            req <- parseRequest url
+            withResponse req man $ \res -> if statusCode (responseStatus res) == 200
                 then do
                     let tmp = fp <.> "tmp"
                     withBinaryFile tmp WriteMode $ \h -> do
